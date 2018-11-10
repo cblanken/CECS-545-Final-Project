@@ -40,6 +40,20 @@ def parse(filePath):
     else:
         return "No match found."
 
+def parseString(node_string):
+    # RegEx to find lines with node info: e.g.)
+    # 1 87.951292 2.658162
+    # 2 33.466597 66.682943
+    # 3 91.778314 53.807184
+    # 4 20.526749 47.633290
+    nodeInputRegEx = re.compile(r'^(\d+)\s(\d+\.\d+)\s(\d+\.\d+)\s(.+)$', re.MULTILINE)
+    nodeList = nodeInputRegEx.findall(node_string)
+    if nodeList != None:
+        return formatNodeList(nodeList)
+    else:
+        return "No match found."
+    pass
+
 def main(path = None):
     # run test
     if path == None:

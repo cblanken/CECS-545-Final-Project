@@ -3,7 +3,7 @@ import random
 import sys
 import math
 import copy
-
+import itertools
 import GraphParse as parse
 
 Node = collections.namedtuple('Node', ['no', 'x', 'y', 'adjList'])
@@ -31,9 +31,6 @@ class Subgraph(Graph):
         ## list of edges leaving the subgraph
         self.id = id
         self.adjList = adjList
-
-
-
 
     def _pruneAdjList(self):
         self.adjList = [edge for edge in self.adjList if edge.dest not in \
@@ -85,7 +82,6 @@ def kcut(graph, k):
     firstNodes = random.sample(graph.nodeList, k)    
     for index, node in enumerate(firstNodes):
         subgraphList[index].addNode(node)
-    print(f"first nodes: {firstNodes}")
 
 
     def findAvailableEdge(subgraph, remaining_nodes):
@@ -100,14 +96,12 @@ def kcut(graph, k):
 
     ## expand each subgraph to fill entire graph
     remainingNodesList = copy.deepcopy(graph.nodeList)
-    print(remainingNodesList)
     for node in firstNodes:
         remainingNodesList.remove(node)
     # print("REMAINING")
     # print(remainingNodesList)
     while remainingNodesList:
         for index, subgraph in enumerate(subgraphList):
-            print(subgraph)
             if subgraph.adjList:
                 # newEdge = random.choice(subgraph.adjList)
                 newEdge = findAvailableEdge(subgraph, remainingNodesList)
@@ -121,41 +115,39 @@ def kcut(graph, k):
                 if newEdge in subgraph.adjList:
                     subgraph.adjList.remove(newEdge)
 
-                print(newEdge)
-                for subgraph in subgraphList:
-                    outlist = [node.no for node in subgraph.nodeList]
-                    print(f"{subgraph.id}")
-                    print(outlist)
-                input("pause")
-            
+                # print(newEdge)
+                # for subgraph in subgraphList:
+                #     outlist = [node.no for node in subgraph.nodeList]
+                #     print(f"{subgraph.id}")
+                #     print(outlist)
+                # input("pause")
     print("FINISHED K-CUT")
     for subgraph in subgraphList:
         outlist = [node.no for node in subgraph.nodeList]
-        print(f"{subgraph.id}")
-        print(outlist)
+        print(f"{subgraph.id}: {outlist}")
+        for adj in subgraph.adjList:
+            print(adj)
     # print(remainingNodesList)
     # print(subgraphList)
     return subgraphList
 
 
-def getKcutFitness(graph, subgraphList):
+def getKcutFitness(subgraphList):
     """Find the fitness of a particular k-cut
     :param graph: 
     :param subgraphList: List (of size k) of subgraphs for a particular k-cut
     :returns: fitness of k-cut
     """
-    # unique_edges = 
-    # sum([edge.fitness for edge in ])
-    pass
-
+    allEdges = list(itertools.chain.from_iterable([subgraph.adjList for subgraph in subgraphList]))
+    allEdgesWeights = [edge.weight for edge in allEdges]    
+    return sum(allEdgesWeights) / 2
+    
 
 
 def main(filepath):
     test_graph = parseInputGraph(filepath)
-    subgraphList = kcut(test_graph, 2)
-    # print(test_graph)
-    # for subgraph in subgraphList:
-    #     print(subgraph)    
+    test_subgraphList = kcut(test_graph, 3)
+    print(getKcutFitness(test_subgraphList))
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
