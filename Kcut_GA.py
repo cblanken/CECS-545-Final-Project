@@ -31,22 +31,38 @@ def _selectSubgraph(kcut):
     while(1):
         chosenSubgraph = random.choice(kcut)
         if len(chosenSubgraph.nodeList) > 1:
-            return chosenSubgraph
+            return chosenSubgraph   
 
-def _pullNode(subgraph, chosenSubgraph, node):
-    subgraph.removeNode(node)
-    chosenSubgraph.addNode(node)
-    print(node)
+def _selectNode(kcut, curr_subgraph):
+    while(1):
+        chosenNode = random.choice(curr_subgraph.nodeList)
+        if len(chosenNode.adjList) > 0:
+            return chosenNode
+
+def _pullNode(pullSubgraph, pushSubgraph, node):
+    pullSubgraph.removeNode(node)
+    pushSubgraph.addNode(node)
 
 def _grow(kcut, graph):
-    chosenSubgraph = _selectSubgraph(kcut)
-    # print(f"NODE LIST: {chosenSubgraph.nodeList}")
-    # print(f"ADJ LIST: {chosenSubgraph.adjList}")
-    chosenEdge = random.choice(chosenSubgraph.adjList)
-    for subgraph in kcut:
-        if subgraph != chosenSubgraph and chosenEdge.dest in [node.no for node in subgraph.nodeList]:
-            chosenNode = graph.nodeList[chosenEdge.dest-1]
-            _pullNode(subgraph, chosenSubgraph, chosenNode)
+    pullSubgraph = _selectSubgraph(kcut)
+    # if TEST_LOG_BIT:
+    #     print("GROWING SUBGRAPH")
+    #     print(f"NODE LIST: {pullSubgraph.nodeList}")
+    #     print(f"ADJ LIST: {pullSubgraph.adjList}")
+
+    chosenNode = _selectNode(kcut, pullSubgraph)
+    while(1):
+        pushSubgraph = random.choice(kcut)
+        if pushSubgraph != pullSubgraph:
+            break
+    # pushSubgraph = random.choice(kcut)
+    _pullNode(pullSubgraph, pushSubgraph, chosenNode)
+
+    # chosenEdge = random.choice(chosenSubgraph.adjList)
+    # for subgraph in kcut:
+    #     if subgraph != chosenSubgraph and chosenEdge.dest in [node.no for node in subgraph.nodeList]:
+    #         chosenNode = graph.nodeList[chosenEdge.dest-1]
+    #         _pullNode(subgraph, chosenSubgraph, chosenNode)
 
 
 ## Mutation functions
@@ -244,14 +260,14 @@ class Generation:
 
         newPopulation = []
         
-        ## keep *elitism_k* members of current population
-        # if elitism:
-        #     def min_func(x):
-        #         return x.fitness
-        #     sample_pop = copy.deepcopy(self.population)
-        #     for dummy in range(elitism_k):
-        #         test = sample_pop.pop(sample_pop.index(min(sample_pop, key = min_func)))
-        #         newPopulation.append(test)
+        # keep *elitism_k* members of current population
+        if elitism:
+            def min_func(x):
+                return x.fitness
+            sample_pop = copy.deepcopy(self.population)
+            for dummy in range(elitism_k):
+                test = sample_pop.pop(sample_pop.index(min(sample_pop, key = min_func)))
+                newPopulation.append(test)
 
         ## create (self.size) new chromosomes by selecting parents and applying crossover and 
         ## mutation operators 
@@ -280,9 +296,14 @@ class Generation:
                 newKcut = globals()[mutation_op](self.graph, newKcut, mutation_k)
 
             newChromosome = Chromosome(newKcut)
+            for subgraph in newChromosome.kcut:
+                if len(subgraph.nodeList) < 1:
+                    print(newChromosome.kcut)
+                    input("EMPTY SUBGRAPH PAUSE")
             if newChromosome:
                 newPopulation.append(newChromosome)
-            print(f"{i} COMPLETE")
+            if TEST_LOG_BIT:
+                print(f"{i} COMPLETE")
         self.population = newPopulation
         self.iteration += 1
 
@@ -292,8 +313,8 @@ class Generation:
         In this case fitness is the shortest possible distance, so
         the lower the better.
         """
-        maxCut = sum( list(itertools.chain.from_iterable([node.adjList for node in\
-            self.graph.nodeList])) )
+        maxCut = sum( [x.weight for x in list(itertools.chain.from_iterable([node.adjList for node in\
+            self.graph.nodeList]))] )
         bestFitness = maxCut
         for i in self.population:
             if i.fitness <= bestFitness:
@@ -342,7 +363,7 @@ class Generation:
             best_kcuts = best_kcuts[0:num_of_solutions + 1]
         
         if include_kcuts:
-            print("## ITER = {0}, best fit = {1}, best kcut(s): {2}".format(self.iteration, 
+            print("## ITER = {0}, best fit = {1}, best kcut(s): {2}".format(self.iteration,
                 best[1], best_kcuts))
         else:
             print("## ITER = {0}, best fit = {1:.4f}, avg fit = {2:.4f}, std dev = {3:.4f}".format(
@@ -351,7 +372,7 @@ class Generation:
 
 
 
-def geneticAlgoGenerator(nodeArray, startNodeID):
+def geneticAlgoGenerator(inputString, pop_size, num_of_gen, k = 2):
     """Genetic algorithm generator
     :param nodeArray: array of nodes (cities)
     :param startNodeID: node ID of starting node (city) 
@@ -361,18 +382,12 @@ def geneticAlgoGenerator(nodeArray, startNodeID):
     console_out = False
     ## log output bit
     log_out = True
-    ## select test and population size
-    test_select = 97
-    ## number of tests to perform (and log)
-    num_of_tests = 50
-    ## size of population
-    popSize = 100
-    ## number of generation to create for each test
-    num_of_gen = 1500
+    ## test selection
+    test_select = 1
     
     ### intialize first gneration
-    currentGen = Generation(nodeArray)
-    currentGen.initPopulation(popSize, 0, 0, startNodeID)
+    currentGen = Generation(inputString)
+    currentGen.initPopulation(pop_size, k)
 
     def run_test(test_num, selection_op, crossover_op, mutation_op, 
         selection_k = None, 
@@ -381,8 +396,8 @@ def geneticAlgoGenerator(nodeArray, startNodeID):
         elitism = True, elitism_k = 5):
         
         if log_out:
-            log.write(f"NUM OF CITIES: {os.path.basename(nodeArray.inputFileName)}\n")
-            log.write(f"TEST {test_num}: pop = {popSize}, # of generations = {num_of_gen} "
+            log.write(f"NUM OF CITIES: {currentGen.population[0].kcut}\n")
+            log.write(f"TEST {test_num}: pop = {pop_size}, # of generations = {num_of_gen} "
                 f"selection = {selection_op}, crossover = {crossover_op}, "
                 f"mutation = {mutation_op}, mutation chance = {mutation_chance}\n")
             log.write("{0:<8}{1:<13}{2:<14}{3:<9}{4}\n".format("iter", "best fit",
@@ -394,40 +409,56 @@ def geneticAlgoGenerator(nodeArray, startNodeID):
                 selection_k = selection_k, crossover_k = crossover_k,
                 elitism = True)   
             if console_out:
-                currentGen.printBestPaths()
+                currentGen.printBestSolutions()
             best = currentGen.getGenInfo()
             if log_out:
                 log.write(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-            yield [x+1 for x in best[-1]]
+            yield best
+    
+    cnt = 1
+    with currentGen.openLog(test_select, cnt) as log:
+        ### Test 3
+        if test_select == 1:
+            time1 = time.time()
+            for generation in run_test(test_num = test_select,
+                    selection_op = "select_parent_tournament", 
+                    crossover_op = "crossover_intersection", 
+                    mutation_op = "mutation_grow", 
+                    selection_k = random.randint(2, int(len(currentGen.population)/10)),
+                    crossover_k = None, mutation_k = None, mutation_chance = 0.2,
+                    elitism = True, elitism_k = 5):
+                yield generation   
+            time2 = time.time()
+            if log_out:
+                log.write("SEARCH TIME = {}".format(time2 - time1))
 
-
-    for cnt in range(num_of_tests):
-        ### intialize first gneration
-        currentGen = Generation(nodeArray)
-        currentGen.initPopulation(popSize, 0, 0, startNodeID)
-        currentGen.iteration = 0
-        with currentGen.openLog(test_select, cnt) as log:
-            ### Test 1
-            if test_select == 1:
-                time1 = time.time()
-                if log_out:
-                    log.write(f"NUM OF CITIES: {os.path.basename(nodeArray.inputFileName)}\n")
-                    log.write("TEST 1: pop = {0}, # of generations = {1} selection = {2}, crossover = {3}, "
-                        "mutation = {4}, mutation chance = {5}\n".format(popSize, num_of_gen, 
-                        "select_parent_tournament", "crossover_davis_order", "mutation_inversion", 0.7))
-                    log.write("{0:<8}{1:<13}{2:<14}{3:<9}{4}\n".format("iter", "best fit", "avg fit", "std dev", "best path"))
+    # for cnt in range(num_of_tests):
+    #     ### intialize first gneration
+    #     currentGen = Generation(nodeArray)
+    #     currentGen.initPopulation(popSize, 0, 0, startNodeID)
+    #     currentGen.iteration = 0
+    #     with currentGen.openLog(test_select, cnt) as log:
+    #         ### Test 1
+    #         if test_select == 1:
+    #             time1 = time.time()
+    #             if log_out:
+    #                 log.write(f"NUM OF CITIES: {os.path.basename(nodeArray.inputFileName)}\n")
+    #                 log.write("TEST 1: pop = {0}, # of generations = {1} selection = {2}, crossover = {3}, "
+    #                     "mutation = {4}, mutation chance = {5}\n".format(popSize, num_of_gen, 
+    #                     "select_parent_tournament", "crossover_davis_order", "mutation_inversion", 0.7))
+    #                 log.write("{0:<8}{1:<13}{2:<14}{3:<9}{4}\n".format("iter", "best fit", "avg fit", "std dev", "best path"))
                 
-                for dummy in range(num_of_gen):
-                    currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_inversion",
-                        mutation_chance=0.7,
-                        selection_k=random.randint(2, int(len(currentGen.population)/2) + 1), 
-                        elitism=True)   
-                    if console_out:
-                        currentGen.printBestPaths()
-                    best = currentGen.getGenInfo()
-                    if log_out:
-                        log.write(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-                    yield [x+1 for x in best[-1]]
+    #             for dummy in range(num_of_gen):
+    #                 currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_inversion",
+    #                     mutation_chance=0.7,
+    #                     selection_k=random.randint(2, int(len(currentGen.population)/2) + 1), 
+    #                     elitism=True)   
+    #                 if console_out:
+    #                     currentGen.printBestPaths()
+    #                 best = currentGen.getGenInfo()
+    #                 if log_out:
+    #                     log.write(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
+    #                 yield [x+1 for x in best[-1]]
 
 
 def main(inputFile):
@@ -435,23 +466,25 @@ def main(inputFile):
     inputString = ""
     with open(inputFile) as graph_input:
         inputString = graph_input.read()
-    currentGen = Generation(inputString)
-    currentGen.initPopulation(5, 5)
-    print("FIRST GEN")
-    for index, chromo in enumerate(currentGen.population):
-        print("-------------------------------------------")
-        print(f"{index} {chromo}: {chromo.kcut}")
-        print("-------------------------------------------")
-    currentGen.iterateGen("select_parent_tournament", "crossover_intersection", "mutation_grow",
-        mutation_chance=1, mutation_k = 1,
-        selection_k=random.randint(2, int(len(currentGen.population)/2) + 1), 
-        elitism=True) 
-    print("SECOND GEN")
-    for index, chromo in enumerate(currentGen.population):
-        print("-------------------------------------------")
-        print(f"{index} {chromo}: {chromo.kcut}")
-        print("-------------------------------------------")
-            
+    # currentGen = Generation(inputString)
+    # currentGen.initPopulation(50, 5)
+    # print("FIRST GEN")
+    # for index, chromo in enumerate(currentGen.population):
+    #     print("-------------------------------------------")
+    #     print(f"{index} {chromo}: {chromo.kcut}")
+    #     print("-------------------------------------------")
+    # currentGen.iterateGen("select_parent_tournament", "crossover_intersection", "mutation_grow",
+    #     mutation_chance=1, mutation_k = 1,
+    #     selection_k=random.randint(2, int(len(currentGen.population)/2) + 1), 
+    #     elitism=True) 
+    # print("SECOND GEN")
+    # for index, chromo in enumerate(currentGen.population):
+    #     print("-------------------------------------------")
+    #     print(f"{index} {chromo}: {chromo.kcut}")
+    #     print("-------------------------------------------")
+    generator = geneticAlgoGenerator(inputString, 50, 100, 5)
+    for x in generator:
+        print(x)
     
 
 if __name__ == "__main__":

@@ -9,6 +9,8 @@ import GraphParse as parse
 Node = collections.namedtuple('Node', ['no', 'x', 'y', 'adjList'])
 Edge = collections.namedtuple('Edge', ['src', 'dest', 'weight'])
 
+TEST_LOG_BIT = False
+
 class Graph:
     """
     """
@@ -53,7 +55,7 @@ class Subgraph(Graph):
     
     def __repr__(self):
         return (
-        f"\nSubgraph {self.id}|\n"
+        f"\nSubgraph {self.id} | "
         f"{[node.no for node in self.nodeList]}")
         # "----------NODE LIST-----------\n"
         # f"{self.nodeList}\n"
@@ -131,15 +133,12 @@ def kcut(graph, k):
                 #     print(f"{subgraph.id}")
                 #     print(outlist)
                 # input("pause")
-    print("FINISHED K-CUT")
+    if TEST_LOG_BIT:
+        print("FINISHED K-CUT")
+        for subgraph in subgraphList:
+            outlist = [node.no for node in subgraph.nodeList]
+            print(f"{subgraph.id}: {outlist}")
 
-    for subgraph in subgraphList:
-        outlist = [node.no for node in subgraph.nodeList]
-        print(f"{subgraph.id}: {outlist}")
-        # for adj in subgraph.adjList:
-        #     print(adj)
-    # print(remainingNodesList)
-    # print(subgraphList)
     return subgraphList
 
 def getKcutEdges(subgraphList):
