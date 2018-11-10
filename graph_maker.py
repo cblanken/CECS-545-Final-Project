@@ -27,7 +27,6 @@ def main(size = 100, outputFileName = "test.tsp" ):
 
     tsp_list = create_tsp_list(int(size))
     edge_lists = create_edge_list(int(size))
-    # tsp_list = [str(city_num) + " " + str(x) + " " + str(y) for city_num, x, y in tsp_list]
     out_list = [" ".join( [str(city_num), str(x), str(y), str(edge_lists[index]) ]) for index, (city_num, x, y) in enumerate(tsp_list)]
 
 
