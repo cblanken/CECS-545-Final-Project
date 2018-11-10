@@ -34,6 +34,14 @@ class Subgraph(Graph):
         self.adjList = [edge for edge in self.adjList if edge.dest not in \
             [node.no for node in  self.nodeList]]
 
+    def removeNode(self, node):
+        for adj in node.adjList:
+            try:
+                self.adjList.remove(adj)
+            except ValueError:
+                continue
+        self.nodeList.remove(node)
+
     def addNode(self, node):
         """Add node to subgraph and update frontier edges/nodes
         :param node: Node to be added to subgraph
@@ -44,13 +52,15 @@ class Subgraph(Graph):
         self._pruneAdjList()
     
     def __repr__(self):
-        return (f"{self.id}|\n"
-        "----------NODE LIST-----------\n"
-        f"{self.nodeList}\n"
-        "----------ADJ LIST------------\n"
-        f"{self.adjList}\n"
-        "-----------------------------------------------------------------\n"
-        "-----------------------------------------------------------------\n")
+        return (
+        f"\nSubgraph {self.id}|\n"
+        f"{[node.no for node in self.nodeList]}")
+        # "----------NODE LIST-----------\n"
+        # f"{self.nodeList}\n"
+        # "----------ADJ LIST------------\n"
+        # f"{self.adjList}\n"
+        # "-----------------------------------------------------------------\n"
+        # "-----------------------------------------------------------------\n")
 
 
 def calcDistance(node1, node2):
@@ -62,7 +72,6 @@ def parseInputGraph(filepath):
         for dest in node[3]] for index, node in enumerate(graph_input) ]
     nodeList = [Node(node[0], node[1], node[2], node_edgeLists[index]) for index, node \
         in enumerate(graph_input)]
-    # graph_edgeList = [edge for edge in [adjList for adjList in [node.adjList for node in node_edgeLists]]]
     return Graph(nodeList)
 
 def parseInputGraphString(graph_input):
@@ -70,8 +79,18 @@ def parseInputGraphString(graph_input):
         for dest in node[3]] for index, node in enumerate(graph_input) ]
     nodeList = [Node(node[0], node[1], node[2], node_edgeLists[index]) for index, node \
         in enumerate(graph_input)]
-    # graph_edgeList = [edge for edge in [adjList for adjList in [node.adjList for node in node_edgeLists]]]
     return Graph(nodeList)    
+
+
+def _findAvailableEdge(subgraph, remaining_nodes):
+    # print("AVAILABLE")
+    # print(remaining_nodes)
+    # input("remaining search pause")
+    random.shuffle(subgraph.adjList)
+    for edge in subgraph.adjList:
+        if edge.dest in [node.no for node in remaining_nodes]:
+            return edge     
+    return None
 
 def kcut(graph, k):
     """Create a random k-cut on graph
@@ -85,15 +104,7 @@ def kcut(graph, k):
     for index, node in enumerate(firstNodes):
         subgraphList[index].addNode(node)
 
-    def findAvailableEdge(subgraph, remaining_nodes):
-        # print("AVAILABLE")
-        # print(remaining_nodes)
-        # input("remaining search pause")
-        random.shuffle(subgraph.adjList)
-        for edge in subgraph.adjList:
-            if edge.dest in [node.no for node in remaining_nodes]:
-                return edge     
-        return None
+
 
     ## expand each subgraph to fill entire graph
     remainingNodesList = copy.deepcopy(graph.nodeList)
@@ -104,8 +115,7 @@ def kcut(graph, k):
     while remainingNodesList:
         for index, subgraph in enumerate(subgraphList):
             if subgraph.adjList:
-                # newEdge = random.choice(subgraph.adjList)
-                newEdge = findAvailableEdge(subgraph, remainingNodesList)
+                newEdge = _findAvailableEdge(subgraph, remainingNodesList)
                 if newEdge == None:
                     continue
                     
@@ -115,7 +125,6 @@ def kcut(graph, k):
                     remainingNodesList.remove(newNode)
                 if newEdge in subgraph.adjList:
                     subgraph.adjList.remove(newEdge)
-
                 # print(newEdge)
                 # for subgraph in subgraphList:
                 #     outlist = [node.no for node in subgraph.nodeList]
@@ -123,6 +132,7 @@ def kcut(graph, k):
                 #     print(outlist)
                 # input("pause")
     print("FINISHED K-CUT")
+
     for subgraph in subgraphList:
         outlist = [node.no for node in subgraph.nodeList]
         print(f"{subgraph.id}: {outlist}")
@@ -132,6 +142,9 @@ def kcut(graph, k):
     # print(subgraphList)
     return subgraphList
 
+def getKcutEdges(subgraphList):
+    allEdges = list(itertools.chain.from_iterable([subgraph.adjList for subgraph in subgraphList]))
+    return allEdges
 
 def getKcutFitness(subgraphList):
     """Find the fitness of a particular k-cut
@@ -139,7 +152,7 @@ def getKcutFitness(subgraphList):
     :param subgraphList: List (of size k) of subgraphs for a particular k-cut
     :returns: fitness of k-cut
     """
-    allEdges = list(itertools.chain.from_iterable([subgraph.adjList for subgraph in subgraphList]))
+    allEdges = getKcutEdges(subgraphList)
     allEdgesWeights = [edge.weight for edge in allEdges]    
     return sum(allEdgesWeights) / 2
     

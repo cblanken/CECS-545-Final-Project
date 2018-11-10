@@ -19,6 +19,7 @@ import copy
 import math
 import time
 import random
+import itertools
 import Kcut
 import GraphParse as gp
 
@@ -26,136 +27,99 @@ LOG_BIT = True
 LOG_GEN_BIT = False
 TEST_LOG_BIT = False
 
+def _selectSubgraph(kcut):
+    while(1):
+        chosenSubgraph = random.choice(kcut)
+        if len(chosenSubgraph.nodeList) > 1:
+            return chosenSubgraph
+
+def _pullNode(subgraph, chosenSubgraph, node):
+    subgraph.removeNode(node)
+    chosenSubgraph.addNode(node)
+    print(node)
+
+def _grow(kcut, graph):
+    chosenSubgraph = _selectSubgraph(kcut)
+    # print(f"NODE LIST: {chosenSubgraph.nodeList}")
+    # print(f"ADJ LIST: {chosenSubgraph.adjList}")
+    chosenEdge = random.choice(chosenSubgraph.adjList)
+    for subgraph in kcut:
+        if subgraph != chosenSubgraph and chosenEdge.dest in [node.no for node in subgraph.nodeList]:
+            chosenNode = graph.nodeList[chosenEdge.dest-1]
+            _pullNode(subgraph, chosenSubgraph, chosenNode)
+
+
+## Mutation functions
+def mutation_grow(graph, kcut, grow_k = None):
+    ## default number of nodes to grow
+    if grow_k == None:
+        grow_k = random.randint(1, len(max(kcut, key=lambda x: len(x.nodeList)).nodeList))
+
+    newKcut = copy.deepcopy(kcut)
+    for _ in range(grow_k):
+        _grow(newKcut, graph)
+    return newKcut
+
+
 ## Crossover functions
-def crossover_davis_order(path1, path2, k = None):
+def crossover_intersection(graph, kcut1, kcut2, k = None):
     """Davis's Order Crossover (AKA Order 1 Crossover or OX1)
     https://www.tutorialspoint.com/genetic_algorithms/genetic_algorithms_crossover.htm
     Returns path with randomized Davis's Order crossover applied.
     """    
-    ## test logging
-    if TEST_LOG_BIT:    
-        print(f"PATH1: {path1}")
-        print(f"PATH2: {path2}")
+    if k == None:
+        k = len(kcut1)
 
-    ## cut off start and end nodes (0) for paths so crossover can be performed
-    ## without disrupting start and end of full path
-    pathStart = path1[0]
-    pathEnd = path1[-1]
-    path1 = path1[1:-1]
-    path2 = path2[1:-1]
-
-    offspring1 = [None for i in path1]
-    offspring2 = [None for i in path2]
-
-    ## start 0 to (1 less than last index)
-    start = random.randint(0, len(path1)-2)
-    ## end start to (last index)
-    end = random.randint(start+1, len(path1)-1)
-   
-    ## test logging
-    if TEST_LOG_BIT: 
-        print(f"START: {start}")
-        print(f"END: {end}")
-        print(f"SEGMENT1: {path1[start:end]}")
-        print(f"SEGMENT2: {path2[start:end]}")
+    kcut1_nodeLists = [set([node.no for node in subgraph.nodeList]) for subgraph in kcut1]
+    kcut2_nodeLists = [set([node.no for node in subgraph.nodeList]) for subgraph in kcut2]
+    graph_nodeList = set([node.no for node in graph.nodeList])
     
-    ### create offspring 1
-    ## segment tranferred from parent to new child
-    offspring1[start:end+1] = path1[start:end+1]
-    ## list of nodes of other parent beginning from *end* index
-    remaining1 = path2[end+1:] + path2[:end+1]
-    ## current iterator over list of remaining nodes to be transferred to offspring
-    remaining1_iter = 0
-    ## current iterator over offspring
-    wraparound1_iter = end + 1
-    while remaining1_iter < len(remaining1) and wraparound1_iter != start:
-        if remaining1[remaining1_iter] not in offspring1[start:end+1]:
-            if wraparound1_iter >= len(offspring1):
-                wraparound1_iter = 0
-            offspring1[wraparound1_iter] = remaining1[remaining1_iter]
-            wraparound1_iter += 1
-        remaining1_iter += 1
+    newKcut_nodeLists = []
+    curr_intersection = {}
+    for nodeList1 in kcut1_nodeLists:
+        best_intersection = {}
+        for nodeList2 in kcut2_nodeLists:
+            curr_intersection = nodeList1 & nodeList2
+            if len(curr_intersection) > len(best_intersection):
+                best_intersection = curr_intersection
+        
+        if best_intersection not in newKcut_nodeLists and best_intersection != set():
+            if TEST_LOG_BIT:
+                print(f"BEST INTERSECTION: {best_intersection}")
+            newKcut_nodeLists.append(best_intersection)
 
-    ### create offspring 2
-    ## segment tranferred from parent to new child
-    offspring2[start:end+1] = path2[start:end+1]
-    ## list of nodes of other parent beginning from *end* index
-    remaining2 = path1[end+1:] + path1[:end+1]
-    ## current iterator over list of remaining nodes to be transferred to offspring
-    remaining2_iter = 0
-    ## current iterator over offspring
-    wraparound2_iter = end + 1
-    while remaining2_iter < len(remaining2) and wraparound2_iter != start:
-        if remaining2[remaining2_iter] not in offspring2[start:end+1]:
-            if wraparound2_iter >= len(offspring2):
-                wraparound2_iter = 0
-            offspring2[wraparound2_iter] = remaining2[remaining2_iter]
-            wraparound2_iter += 1
-        remaining2_iter += 1    
-
-
-    ## add start and end of path back to offspring paths
-    offspring1 = [pathStart] + offspring1 + [pathEnd] 
-    offspring2 = [pathStart] + offspring2 + [pathEnd] 
-    ## test logging
     if TEST_LOG_BIT:
-        print(f"OFFSPRING1: {offspring1}")
-        print(f"OFFSPRING2: {offspring2}")
-    return (offspring1, offspring2)
+        print("FOUND BEST INTERSECTIONS")
+    newKcut_nodeLists = [set(nodeList) for nodeList in newKcut_nodeLists]
+    allNodes = copy.deepcopy(graph_nodeList)
+    union = set()
+    for kcut in newKcut_nodeLists:
+        union = union | kcut
+    remainingNodes = allNodes - union
 
+    newKcut = [Kcut.Subgraph(index, [], []) for index in range(k)]
+    for index, subgraph in enumerate(newKcut):
+        for node_num in newKcut_nodeLists[index]:
+            subgraph.addNode(graph.nodeList[node_num-1])
 
-## Mutation functions
-def mutation_inversion(path, range = None):
-    """Mutates path by selecting range of consecutive cities/nodes in 
-    *path* and inverting the order in which the cities are visited
-    :param path: path of new chromosome to be mutated
-    :returns: path with scramble mutation applied.
-    """
-    ## restrict path to internal nodes (not first and last which are pre-determined)
-    pathStart = path[0]
-    pathEnd = path[-1]
-    path = path[1:-1]
-    ## default range
-    if range == None:
-        range = random.randint( 1, math.floor(len(path)/2) + 1)
-    elif range >= len(path):
-        print("ERR: mutation_scramble range set too large. Defaulted to 3")
-        range = 3
-    # ## init start and end of range
-    # start = random.randint(0, len(path) - range - 1)
-    # end = start + range
-    # ## invert range in place
-    # invert_range = path[start:end]
-    # invert_range.reverse()
-    # path[start:end] = invert_range
-    # path = [pathStart] + path + [pathEnd]
-    # return path
-
-    ## init start and end of range
-    start = random.randint(0, len(path) - 1)
-    end = (start + range) % len(path)
-    ## invert range across end of path
-    if start > end:
-        ## offset the path so start comes before end
-        offset_path = [node for node in path[start:] + path[:end] + path[end:start]]
-        ## get inverse of nodes from start -> end
-        invert_range = offset_path[(len(path) - 1 - start + end)::-1]
-        ## set offset path with new inverted range (start -> end)
-        offset_path = invert_range + offset_path[(len(path) - start + end):]
-        ## undo offset of offset_path
-        path = offset_path[len(path) - start : len(path) - start + end] + \
-            offset_path[(len(path) - start + end):] + \
-            offset_path[0:len(path)-start]
-    ## invert range in place    
-    else:
-        invert_range = path[start:end]
-        invert_range.reverse()
-        path[start:end] = invert_range
-
-    ## prepend and append start node for full path    
-    path = [pathStart] + path + [pathEnd]
-    return path
-
+    remainingNodes = [graph.nodeList[index-1] for index in remainingNodes]
+    remainingNodesList = list(remainingNodes)
+    while remainingNodesList:
+        for index, subgraph in enumerate(newKcut):
+            if subgraph.adjList:
+                newEdge = Kcut._findAvailableEdge(subgraph, remainingNodesList)
+                if newEdge == None:
+                    continue
+                    
+                newNode = graph.nodeList[newEdge.dest-1]
+                subgraph.addNode(newNode)
+                if newNode in remainingNodesList:
+                    remainingNodesList.remove(newNode)
+                if newEdge in subgraph.adjList:
+                    subgraph.adjList.remove(newEdge)
+    if TEST_LOG_BIT:
+        print(f"NEW CROSSOVER KCUT: {newKcut}")
+    return newKcut
 
 ## Parent Selection functions
 def select_parent_tournament(generation, k = None):
@@ -219,7 +183,7 @@ class Chromosome:
         self.fitness = Kcut.getKcutFitness(kcut)
 
     def __str__(self):
-        return "Fitness: {}, K-cut: {}".format(self.fitness, self.kcut)
+        return "Fitness: {}, K-cuts: {}".format(self.fitness, len(self.kcut))
 
     __repr__ = __str__
 
@@ -281,17 +245,18 @@ class Generation:
         newPopulation = []
         
         ## keep *elitism_k* members of current population
-        if elitism:
-            def min_func(x):
-                return x.fitness
-            sample_pop = copy.deepcopy(self.population)
-            for dummy in range(elitism_k):
-                test = sample_pop.pop(sample_pop.index(min(sample_pop, key = min_func)))
-                newPopulation.append(test)
+        # if elitism:
+        #     def min_func(x):
+        #         return x.fitness
+        #     sample_pop = copy.deepcopy(self.population)
+        #     for dummy in range(elitism_k):
+        #         test = sample_pop.pop(sample_pop.index(min(sample_pop, key = min_func)))
+        #         newPopulation.append(test)
 
         ## create (self.size) new chromosomes by selecting parents and applying crossover and 
         ## mutation operators 
-        for dummy in range(len(self.population) - elitism_k):
+        # for i in range(len(self.population) - elitism_k):
+        for i in range(len(self.population)):
             newChromosome = None
             ## select (2) parents
             parent1 = globals()[selection_op](self, selection_k)
@@ -308,42 +273,44 @@ class Generation:
             ## randomly selects between two children produced by crossover
             # newPath = globals()[crossover_op](parent1.path, parent2.path)[random.randint(1,2) % 2]
             ## selects first offspring of crossover
-            newPath = globals()[crossover_op](parent1.path, parent2.path)[0]
+            newKcut = globals()[crossover_op](self.graph, parent1.kcut, parent2.kcut)
             
             ## apply mutation
             if random.randint(1, int(1/mutation_chance)) == 1:
-                newPath = globals()[mutation_op](newPath, mutation_k)
-            newChromosome = Chromosome(newPath, self.nodeArray.distanceList)
+                newKcut = globals()[mutation_op](self.graph, newKcut, mutation_k)
+
+            newChromosome = Chromosome(newKcut)
             if newChromosome:
                 newPopulation.append(newChromosome)
+            print(f"{i} COMPLETE")
         self.population = newPopulation
         self.iteration += 1
 
     ## Generation data retrieval functions
-    def getGenInfo(self):
-        """Returns all generation info"""
-        iteration = self.iteration
-        best = self.getBestPath()
-        bestFitness = best[1]
-        bestPath = best[0][0]
-        avgFitness = self.calcAverageFitness()
-        stdDev = self.calcStandardDeviation()
-        return (iteration, bestFitness, avgFitness, stdDev, bestPath)
-
-    def getBestPath(self):
+    def getBestSolution(self):
         """Returns list of best possible paths.
         In this case fitness is the shortest possible distance, so
         the lower the better.
         """
-        maxDist = max( [distance for distanceList in self.nodeArray.distanceList for 
-                        distance in distanceList] )
-        bestFitness = maxDist * len(self.nodeArray.nodeList)
+        maxCut = sum( list(itertools.chain.from_iterable([node.adjList for node in\
+            self.graph.nodeList])) )
+        bestFitness = maxCut
         for i in self.population:
             if i.fitness <= bestFitness:
                 bestFitness = i.fitness
         
-        pathList = [x.path for x in self.population if x.fitness==bestFitness]
-        return (pathList, bestFitness)
+        kcutList = [x.kcut for x in self.population if x.fitness == bestFitness]
+        return (kcutList, bestFitness)
+
+    def getGenInfo(self):
+        """Returns all generation info"""
+        iteration = self.iteration
+        best = self.getBestSolution()
+        bestFitness = best[1]
+        bestKcut = best[0]
+        avgFitness = self.calcAverageFitness()
+        stdDev = self.calcStandardDeviation()
+        return (iteration, bestFitness, avgFitness, stdDev, bestKcut)
 
     ## printing / logging functions
     def openLog(self, test_select, cnt):
@@ -368,15 +335,15 @@ class Generation:
         for index, k in enumerate(self.population):
             print("ID: {0}, Fitness: {1}, Path: {2}".format(index, k.fitness, k.path))
 
-    def printBestSolutions(self, num_of_paths = 0, include_paths = False):
-        best = self.getBestPath()
-        best_paths = best[0]
-        if num_of_paths < len(best_paths):
-            best_paths = best_paths[0:num_of_paths + 1]
+    def printBestSolutions(self, num_of_solutions = 0, include_kcuts = False):
+        best = self.getBestSolution()
+        best_kcuts = best[0]
+        if num_of_solutions < len(best_kcuts):
+            best_kcuts = best_kcuts[0:num_of_solutions + 1]
         
-        if include_paths:
-            print("## ITER = {0}, best fitness = {1}, best path(s): {2}".format(self.iteration, 
-                best[1], best_paths))
+        if include_kcuts:
+            print("## ITER = {0}, best fit = {1}, best kcut(s): {2}".format(self.iteration, 
+                best[1], best_kcuts))
         else:
             print("## ITER = {0}, best fit = {1:.4f}, avg fit = {2:.4f}, std dev = {3:.4f}".format(
                 self.iteration, best[1], self.calcAverageFitness(), 
@@ -465,12 +432,26 @@ def geneticAlgoGenerator(nodeArray, startNodeID):
 
 def main(inputFile):
     ## create first generation
+    inputString = ""
     with open(inputFile) as graph_input:
         inputString = graph_input.read()
-        currentGen = Generation(inputString)
-        currentGen.initPopulation(50, 5)
-        for x in currentGen.population:
-            print(x.fitness)
+    currentGen = Generation(inputString)
+    currentGen.initPopulation(5, 5)
+    print("FIRST GEN")
+    for index, chromo in enumerate(currentGen.population):
+        print("-------------------------------------------")
+        print(f"{index} {chromo}: {chromo.kcut}")
+        print("-------------------------------------------")
+    currentGen.iterateGen("select_parent_tournament", "crossover_intersection", "mutation_grow",
+        mutation_chance=1, mutation_k = 1,
+        selection_k=random.randint(2, int(len(currentGen.population)/2) + 1), 
+        elitism=True) 
+    print("SECOND GEN")
+    for index, chromo in enumerate(currentGen.population):
+        print("-------------------------------------------")
+        print(f"{index} {chromo}: {chromo.kcut}")
+        print("-------------------------------------------")
+            
     
 
 if __name__ == "__main__":
