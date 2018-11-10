@@ -20,6 +20,7 @@ import math
 import time
 import random
 import Kcut
+import GraphParse as gp
 
 LOG_BIT = True
 LOG_GEN_BIT = False
@@ -210,35 +211,24 @@ def select_parent_roulette(generation, k = None):
         print(f"p (partial): {p}")
         print(f"s (sum): {s}")
 
-
-## Survivor Selection functions
-def select_survivors_tournament(generation):
-    """
-    """
-
-
-def select_survivors_roulette(generation):
-    """
-    """
-
 class Chromosome:
     """
     """
-    def __init__(self, path, distanceList):
-        self.path = path
-        self.fitness = calcPathDistance(self.path, distanceList)
+    def __init__(self, kcut):
+        self.kcut = kcut
+        self.fitness = Kcut.getKcutFitness(kcut)
 
     def __str__(self):
-        return "Fitness: {}, Path: {}".format(self.fitness, self.path)
+        return "Fitness: {}, K-cut: {}".format(self.fitness, self.kcut)
 
     __repr__ = __str__
 
 class Generation:
     """
     """
-    def __init__(self, nodeArray):
+    def __init__(self, graph_string):
         self.iteration = 0
-        self.nodeArray = nodeArray
+        self.graph = Kcut.parseInputGraphString(gp.parseString(graph_string))
         self.population = []
         self.size = len(self.population)
         self.logFile = None
@@ -252,49 +242,15 @@ class Generation:
     def calcStandardDeviation(self):
         avgFit = self.calcAverageFitness()
         # print( [x.fitness for x in sel])
-        sd = math.sqrt( sum( [abs(x.fitness - avgFit)**2 for x in self.population] )  / len(self.population) )
+        sd = math.sqrt( sum( [abs(x.fitness - avgFit)**2 for x in self.population] ) / len(self.population) )
         return sd
 
-    def initPopulation(self, randomSplit, greedyEdgeSplit = 0, greedyVertexSplit = 0, startNode = 0):
+    def initPopulation(self, size, k):
         """Initializes population of paths(chomosomes)
-        The population size will be equal to len(randomSplit) + len(greedySplit).
-        :param randomSplit: number of paths to generate by randomly selecting a path
-        :param greetyEdgeSplit: number of paths/chromosomes to generate with a greedy approach (using 
-            a ClosestEdgeInsertion heuristic)
-        :param greedyVertexSplit: number of paths/chromosomes to generate with a greedy approach (using 
-            a ClosestVertexInsertion heuristic)
+        The population size will be equal to size.
+        :param size: Size of population
         """
-        self.population = []
-        ## length of path remaining after choosing node *startNode* as start location
-        choiceListSize = len(self.nodeArray.nodeList) 
-        randomNodes = random.sample(range(0, choiceListSize), choiceListSize)
-        randomNodes.remove(startNode)
-        for dummy in range(randomSplit):
-            newPath = [startNode] + randomNodes + [startNode]
-            newChromosome = Chromosome(newPath, self.nodeArray.distanceList)
-            self.population.append(newChromosome)
-            
-        for dummy in range(greedyVertexSplit):
-            generator = ce.greedySearchGeneratorByVertex(self.nodeArray, startNode)
-            newPath = []
-            for path in generator:
-                newPath = path
-            ## reduce all node IDs by one since generator yields with index beginning
-            ## at 1 for GUI display reasons
-            newPath = [x-1 for x in list(newPath)]
-            newChromosome = Chromosome(newPath, self.nodeArray.distanceList)
-            self.population.append(newChromosome)
-
-        for dummy in range(greedyEdgeSplit):
-            generator = ce.greedySearchGeneratorByEdge(self.nodeArray, startNode)
-            newPath = []
-            for path in generator:
-                newPath = path
-            ## reduce all node IDs by one since generator yields with index beginning
-            ## at 1 for GUI display reasons
-            newPath = [x-1 for x in list(newPath)]
-            newChromosome = Chromosome(newPath, self.nodeArray.distanceList)
-            self.population.append(newChromosome)
+        self.population = [Chromosome(Kcut.kcut(self.graph, k)) for _ in range(size)]
 
 
     def iterateGen(self, selection_op, crossover_op, mutation_op, 
@@ -344,8 +300,8 @@ class Generation:
             ## test logging
             if TEST_LOG_BIT:
                 print("-------------------------------------------")
-                print(f"PARENT1: {parent1.path}")
-                print(f"PARENT2: {parent2.path}")
+                print(f"PARENT1: {parent1.kcut}")
+                print(f"PARENT2: {parent2.kcut}")
             
             ## apply crossover
             ## NOT CURRENTLY SUPPORTED BY PMX CROSSOVER (it currently generates one child)
@@ -412,7 +368,7 @@ class Generation:
         for index, k in enumerate(self.population):
             print("ID: {0}, Fitness: {1}, Path: {2}".format(index, k.fitness, k.path))
 
-    def printBestPaths(self, num_of_paths = 0, include_paths = False):
+    def printBestSolutions(self, num_of_paths = 0, include_paths = False):
         best = self.getBestPath()
         best_paths = best[0]
         if num_of_paths < len(best_paths):
@@ -505,236 +461,17 @@ def geneticAlgoGenerator(nodeArray, startNodeID):
                     if log_out:
                         log.write(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
                     yield [x+1 for x in best[-1]]
-            
-
-            ### Test 2
-            if test_select == 2:
-                time1 = time.time()
-                if log_out:
-                    log.write(f"NUM OF CITIES: {os.path.basename(nodeArray.inputFileName)}\n")
-                    log.write("TEST 1: pop = {0}, # of generations = {1} selection = {2}, crossover = {3}, "
-                        "mutation = {4}, mutation chance = {5}\n".format(popSize, num_of_gen, 
-                        "select_parent_tournament", "crossover_davis_order", "mutation_inversion", 0.3))
-                    log.write("{0:<8}{1:<13}{2:<14}{3:<9}{4}\n".format("iter", "best fit", "avg fit", "std dev", "best path"))
-                
-                for dummy in range(num_of_gen):
-                    currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_inversion",
-                        mutation_chance=0.3,
-                        selection_k=random.randint(2, int(len(currentGen.population)/2) + 1), 
-                        elitism=True)   
-                    if console_out:
-                        currentGen.printBestPaths()
-                    best = currentGen.getGenInfo()
-                    if log_out:
-                        log.write(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-                    yield [x+1 for x in best[-1]]
-            
-            ### Test 3
-            if test_select == 3:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/10)),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.7,
-                        elitism = True, elitism_k = 5):
-                    yield generation   
-
-            ### Test 4
-            if test_select == 4:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/2) + 1),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.3,
-                        elitism = True, elitism_k = 5):
-                    yield generation   
-
-            ### Test 5
-            if test_select == 5:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/2) + 1),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.5,
-                        elitism = True, elitism_k = 5):
-                    yield generation 
-
-            ### Test 22
-            if test_select == 22:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/2) + 1),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.5,
-                        elitism = True, elitism_k = 5):
-                    yield generation 
-
-            ### Test 44
-            if test_select == 44:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/2) + 1),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.5,
-                        elitism = True, elitism_k = 5):
-                    yield generation 
-
-            ### Test 77
-            if test_select == 77:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/2) + 1),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.5,
-                        elitism = True, elitism_k = 5):
-                    yield generation 
-
-            ### Test 97
-            if test_select == 97:
-                time1 = time.time()
-                for generation in run_test(test_num = test_select,
-                        selection_op = "select_parent_tournament", 
-                        crossover_op = "crossover_davis_order", 
-                        mutation_op = "mutation_inversion", 
-                        selection_k = random.randint(2, int(len(currentGen.population)/2) + 1),
-                        crossover_k = None, mutation_k = None, mutation_chance = 0.5,
-                        elitism = True, elitism_k = 5):
-                    yield generation 
-
-            time2 = time.time()
-            if log_out:
-                log.write("SEARCH TIME = {}".format(time2 - time1))
 
 
-
-    ## TESTS FOR CECS 545 PROJECT 4
-    # for _ in range(4):
-    #     for cnt in range(50):
-    #         ### intialize first gneration
-    #         currentGen = Generation(nodeArray)
-    #         currentGen.initPopulation(popSize, 0, 0, startNodeID)
-    #         currentGen.iteration = 0
-    #         currentGen.openLog(test_select, cnt)
-    #         ### Test 1
-    #         if test_select == 1:
-    #             currentGen.writeLog(f"TEST 1: pop = {popSize}\n")
-    #             currentGen.writeLog("iter\tbest fit\t  avg fit\t  std dev\tbest path\n")
-    #             for dummy in range(num_of_gen):
-    #                 currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_inversion",
-    #                     mutation_chance=0.7,
-    #                     selection_k=random.randint(2, int(len(currentGen.population)/2)), 
-    #                     elitism=True)   
-    #                 if console_out:
-    #                     currentGen.printBestPaths()
-    #                 best = currentGen.getGenInfo()
-    #                 currentGen.writeLog(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-    #                 yield [x+1 for x in best[-1]]
-    #         ###===================================================================================================
-            
-
-    #         ### Test 2
-    #         if test_select == 2:
-    #             currentGen.writeLog(f"TEST 2: pop = {popSize}\n")
-    #             currentGen.writeLog("iter\tbest fit\t  avg fit\t  std dev\tbest path\n")
-    #             for dummy in range(num_of_gen):
-    #                 currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_swap",
-    #                     mutation_chance=0.7,
-    #                     selection_k=random.randint(2, int(len(currentGen.population)/2)), 
-    #                     elitism=True)   
-    #                 if console_out:
-    #                     currentGen.printBestPaths()
-    #                 best = currentGen.getGenInfo()
-    #                 currentGen.writeLog(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-    #                 yield [x+1 for x in best[-1]] 
-    #         ###===================================================================================================
-
-
-    #         ### Test 3
-    #         if test_select == 3:
-    #             currentGen.writeLog(f"TEST 3: pop = {popSize}\n")
-    #             currentGen.writeLog("iter\tbest fit\t  avg fit\t  std dev\tbest path\n")
-    #             for dummy in range(num_of_gen):
-    #                 currentGen.iterateGen("select_parent_tournament", "crossover_pmx", "mutation_inversion",
-    #                     mutation_chance=0.7,
-    #                     selection_k=random.randint(2, int(len(currentGen.population)/2)), 
-    #                     elitism=True)   
-    #                 if console_out:
-    #                     currentGen.printBestPaths()
-    #                 best = currentGen.getGenInfo()
-    #                 currentGen.writeLog(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-    #                 yield [x+1 for x in best[-1]]
-    #         ###===================================================================================================
-            
-            
-    #         ### Test 4
-    #         if test_select == 4:
-    #             currentGen.writeLog(f"TEST 4: pop = {popSize}\n")
-    #             currentGen.writeLog("iter\tbest fit\t  avg fit\t  std dev\tbest path\n")
-    #             for dummy in range(num_of_gen):
-    #                 currentGen.iterateGen("select_parent_tournament", "crossover_pmx", "mutation_swap",
-    #                     mutation_chance=0.7,
-    #                     selection_k=random.randint(2, int(len(currentGen.population)/2)), 
-    #                     elitism=True)   
-    #                 if console_out:
-    #                     currentGen.printBestPaths()
-    #                 best = currentGen.getGenInfo()
-    #                 currentGen.writeLog(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-    #                 yield [x+1 for x in best[-1]]
-    #         ###===================================================================================================
-    #         currentGen.closeLog()
-    #     test_select += 1
-
-
-def main(inputFileName):
+def main(inputFile):
     ## create first generation
-    currentGen = Generation(na.NodeArray(inputFileName))
-    currentGen.initPopulation(50, 0, 0)
+    with open(inputFile) as graph_input:
+        inputString = graph_input.read()
+        currentGen = Generation(inputString)
+        currentGen.initPopulation(50, 5)
+        for x in currentGen.population:
+            print(x.fitness)
     
-    ## test logging
-    if TEST_LOG_BIT: 
-        currentGen.printPopulation()
-        currentGen.printBestPaths()
-
-    ## crossover / mutation / parameter combination testing
-    for _ in range(50):
-        currentGen.printBestPaths()
-        for dummy in range(40):
-            currentGen.iterateGen("select_parent_roulette", "crossover_davis_order", "mutation_inversion",
-                mutation_chance=0.25, selection_k=int(len(currentGen.population)/10), elitism=True)    
-
-        for dummy in range(20):
-            currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_swap",
-                mutation_chance=0.25, mutation_k=20, selection_k=int(len(currentGen.population)/10), 
-                elitism=True) 
-
-        for dummy in range(30):
-            currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_swap",
-                mutation_chance=0.25, selection_k=int(len(currentGen.population)/5), 
-                elitism=True) 
-
-        for dummy in range(20):
-            currentGen.iterateGen("select_parent_roulette", "crossover_davis_order", "mutation_swap",
-                mutation_chance=0.25, mutation_k=20, selection_k=int(len(currentGen.population)/2), 
-                elitism=True) 
-        
-        for dummy in range(40):
-            currentGen.iterateGen("select_parent_tournament", "crossover_davis_order", "mutation_inversion",
-                mutation_chance = 0.3, mutation_k=int(len(currentGen.population)/5), 
-                selection_k=int(len(currentGen.population)/10), elitism=True) 
-    currentGen.printBestPaths()
-
 
 if __name__ == "__main__":
     main(sys.argv[1])
