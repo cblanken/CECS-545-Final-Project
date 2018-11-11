@@ -72,7 +72,7 @@ def printAgreementMatrix(agreement, fittest):
     print("\nAGREEMENT MATRIX:")
     alignmentList = [len(str(x))+1 for x in range(len(agreement))]
     newRange = f"{' ':<{len(x)+1}}".join([str(x+1) for x in range(len(agreement))])
-    print(f"{'':<6}", newRange)
+    print(f" {'':<6}", newRange)
     print(f"{'':<7}", end="")
     for i in range(len(newRange)):
         print("-", end="")
@@ -83,7 +83,7 @@ def printAgreementMatrix(agreement, fittest):
         print(f"{i+1:>4}", end="")
         for j, y in enumerate(x):
             colStr = f"{y}"
-            print(f"{colStr:>{alignmentList[j]+2}}", end="")
+            print(f"{colStr:>{alignmentList[j]+3}}", end="")
         print()
 
 

@@ -272,7 +272,7 @@ class Generation:
         ## create (self.size) new chromosomes by selecting parents and applying crossover and 
         ## mutation operators 
         # for i in range(len(self.population) - elitism_k):
-        for i in range(len(self.population)):
+        for i in range(len(self.population) - elitism_k):
             newChromosome = None
             ## select (2) parents
             parent1 = globals()[selection_op](self, selection_k)
@@ -486,7 +486,7 @@ def main(inputFile):
     #     print("-------------------------------------------")
     for i in range(1, 25):
         generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 25, 
-            test_select = 5, cnt = i, k = 8)
+            test_select = 6, cnt = i, k = 6)
         for _ in generator:
             pass
 

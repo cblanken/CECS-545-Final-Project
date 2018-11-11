@@ -146,6 +146,26 @@ def getKcutEdges(subgraphList):
     return allEdges
 
 
+# def getKcutFitness(subgraphList):
+#     """Find the fitness of a particular k-cut
+#     :param graph: 
+#     :param subgraphList: List (of size k) of subgraphs for a particular k-cut
+#     :returns: fitness of k-cut
+#     """
+#     allEdges = getKcutEdges(subgraphList)
+#     allEdgesWeights = [edge.weight for edge in allEdges]    
+#     total_cost = (sum(allEdgesWeights) / 2)
+#     fitness = 0
+#     for s in subgraphList:
+#         node_ids = []
+#         for node in s.nodeList:
+#             node_ids.append(node.no)
+#         for node in s.nodeList:
+#             s_edges = list(e for e in node.adjList if e.dest in node_ids)
+#         s_weights = [edge.weight for edge in s_edges]
+#         fitness += (total_cost / ((sum(s_weights)/2) + 1))
+#     return fitness
+
 def getKcutFitness(subgraphList):
     """Find the fitness of a particular k-cut
     :param graph: 
@@ -154,18 +174,7 @@ def getKcutFitness(subgraphList):
     """
     allEdges = getKcutEdges(subgraphList)
     allEdgesWeights = [edge.weight for edge in allEdges]    
-    total_cost = (sum(allEdgesWeights) / 2)
-    fitness = 0
-    for s in subgraphList:
-        node_ids = []
-        for node in s.nodeList:
-            node_ids.append(node.no)
-        for node in s.nodeList:
-            s_edges = list(e for e in node.adjList if e.dest in node_ids)
-        s_weights = [edge.weight for edge in s_edges]
-        fitness += (total_cost / ((sum(s_weights)/2) + 1))
-    return fitness
-
+    return sum(allEdgesWeights) / 2
 
 def getKcutCost(subgraphList):
     """Find the fitness of a particular k-cut
