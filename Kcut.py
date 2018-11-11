@@ -55,7 +55,7 @@ class Subgraph(Graph):
     
     def __repr__(self):
         return (
-        f"\nSubgraph {self.id} | "
+        f"Subgraph {self.id} | "
         f"{[node.no for node in self.nodeList]}")
         # "----------NODE LIST-----------\n"
         # f"{self.nodeList}\n"

@@ -337,7 +337,7 @@ class Generation:
     def openLog(self, test_select, cnt):
         n = str(test_select)
         cnt = str(cnt)
-        logPath = os.path.normpath(f"./log_files/p5_logs/TEST{n}/")
+        logPath = os.path.normpath(f"./log_files/TEST{n}/")
         if not os.path.exists(logPath):
             os.makedirs(logPath)
         self.logFile = open(os.path.normpath(f"{logPath}/{cnt}.txt"), 'w')
@@ -372,7 +372,7 @@ class Generation:
 
 
 
-def geneticAlgoGenerator(inputString, pop_size, num_of_gen, k = 2):
+def geneticAlgoGenerator(inputString, pop_size, num_of_gen, test_select, cnt, k = 2,):
     """Genetic algorithm generator
     :param nodeArray: array of nodes (cities)
     :param startNodeID: node ID of starting node (city) 
@@ -382,8 +382,6 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, k = 2):
     console_out = False
     ## log output bit
     log_out = True
-    ## test selection
-    test_select = 1
     
     ### intialize first gneration
     currentGen = Generation(inputString)
@@ -396,12 +394,12 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, k = 2):
         elitism = True, elitism_k = 5):
         
         if log_out:
-            log.write(f"NUM OF CITIES: {currentGen.population[0].kcut}\n")
+            log.write(f"NUM OF NODES: {len(currentGen.graph.nodeList)}\n")
             log.write(f"TEST {test_num}: pop = {pop_size}, # of generations = {num_of_gen} "
                 f"selection = {selection_op}, crossover = {crossover_op}, "
                 f"mutation = {mutation_op}, mutation chance = {mutation_chance}\n")
-            log.write("{0:<8}{1:<13}{2:<14}{3:<9}{4}\n".format("iter", "best fit",
-                f"avg fit", "std dev", "best path"))
+            log.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format("iter", "best fit",
+                f"avg fit", "std dev", "best cut"))
         
         for dummy in range(num_of_gen):
             currentGen.iterateGen(selection_op, crossover_op, mutation_op,
@@ -412,25 +410,22 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, k = 2):
                 currentGen.printBestSolutions()
             best = currentGen.getGenInfo()
             if log_out:
-                log.write(f"{best[0]:5d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
+                log.write(f"{best[0]:4d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
             yield best
     
-    cnt = 1
     with currentGen.openLog(test_select, cnt) as log:
-        ### Test 3
-        if test_select == 1:
-            time1 = time.time()
-            for generation in run_test(test_num = test_select,
-                    selection_op = "select_parent_tournament", 
-                    crossover_op = "crossover_intersection", 
-                    mutation_op = "mutation_grow", 
-                    selection_k = random.randint(2, int(len(currentGen.population)/10)),
-                    crossover_k = None, mutation_k = None, mutation_chance = 0.2,
-                    elitism = True, elitism_k = 5):
-                yield generation   
-            time2 = time.time()
-            if log_out:
-                log.write("SEARCH TIME = {}".format(time2 - time1))
+        time1 = time.time()
+        for generation in run_test(test_num = test_select,
+                selection_op = "select_parent_tournament", 
+                crossover_op = "crossover_intersection", 
+                mutation_op = "mutation_grow", 
+                selection_k = random.randint(2, int(len(currentGen.population)/10)),
+                crossover_k = None, mutation_k = None, mutation_chance = 0.2,
+                elitism = True, elitism_k = 5):
+            yield generation   
+        time2 = time.time()
+        if log_out:
+            log.write("SEARCH TIME = {}".format(time2 - time1))
 
     # for cnt in range(num_of_tests):
     #     ### intialize first gneration
@@ -482,10 +477,10 @@ def main(inputFile):
     #     print("-------------------------------------------")
     #     print(f"{index} {chromo}: {chromo.kcut}")
     #     print("-------------------------------------------")
-    generator = geneticAlgoGenerator(inputString, 50, 100, 5)
-    for x in generator:
-        print(x)
-    
+    generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 12, 
+        test_select = 2, cnt = 1, k = 5)
+    for _ in generator:
+        pass
 
 if __name__ == "__main__":
     main(sys.argv[1])
