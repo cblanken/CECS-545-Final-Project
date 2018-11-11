@@ -394,7 +394,7 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, test_select, cnt, k 
         elitism = True, elitism_k = 5):
         
         if log_out:
-            log.write(f"NUM OF NODES: {len(currentGen.graph.nodeList)}\n")
+            log.write(f"NUM OF NODES: {len(currentGen.graph.nodeList)}, K: {k}\n")
             log.write(f"TEST {test_num}: pop = {pop_size}, # of generations = {num_of_gen} "
                 f"selection = {selection_op}, crossover = {crossover_op}, "
                 f"mutation = {mutation_op}, mutation chance = {mutation_chance}\n")
@@ -420,8 +420,8 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, test_select, cnt, k 
                 crossover_op = "crossover_intersection", 
                 mutation_op = "mutation_grow", 
                 selection_k = random.randint(2, int(len(currentGen.population)/10)),
-                crossover_k = None, mutation_k = None, mutation_chance = 0.2,
-                elitism = True, elitism_k = 5):
+                crossover_k = None, mutation_k = random.randint(2, 5),
+                mutation_chance = 0.1, elitism = True, elitism_k = 5):
             yield generation   
         time2 = time.time()
         if log_out:
@@ -477,10 +477,11 @@ def main(inputFile):
     #     print("-------------------------------------------")
     #     print(f"{index} {chromo}: {chromo.kcut}")
     #     print("-------------------------------------------")
-    generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 12, 
-        test_select = 2, cnt = 1, k = 5)
-    for _ in generator:
-        pass
+    for i in range(1, 10):
+        generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 100, 
+            test_select = 1, cnt = i, k = i*2)
+        for _ in generator:
+            pass
 
 if __name__ == "__main__":
     main(sys.argv[1])
