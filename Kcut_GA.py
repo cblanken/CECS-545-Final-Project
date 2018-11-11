@@ -409,9 +409,12 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, test_select, cnt, k 
             if console_out:
                 currentGen.printBestSolutions()
             best = currentGen.getGenInfo()
+            s = [node.nodeList for node in best[4][0]]
+            st = [[x.no for x in y] for y in s]
             if log_out:
-                log.write(f"{best[0]:4d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t{best[3]:>10.4f}\t{best[4]}\n")
-            yield best
+                log.write(f"{best[0]:4d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t"
+                          f"{best[3]:>10.4f}\t{st}\n")
+            yield (best[4], best[1])
     
     with currentGen.openLog(test_select, cnt) as log:
         time1 = time.time()
@@ -477,9 +480,9 @@ def main(inputFile):
     #     print("-------------------------------------------")
     #     print(f"{index} {chromo}: {chromo.kcut}")
     #     print("-------------------------------------------")
-    for i in range(1, 10):
-        generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 100, 
-            test_select = 1, cnt = i, k = i*2)
+    for i in range(1, 11):
+        generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 25, 
+            test_select = 1, cnt = i, k = 4)
         for _ in generator:
             pass
 
