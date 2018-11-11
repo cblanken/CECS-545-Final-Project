@@ -20,8 +20,13 @@ agreement_matrix = []
 ## list of dictionaries containing (valid TSP solution, fitness) to be aggregated
 ### EXAMPLE input_list
 # input_list = [
-#     {"cost": 320.1821, "kcut": subgraphList}, 
-#     ...
+#       (fitness, cost, subgraphList),
+#       EXAMPLES:
+#       (2174.3236, 522.4288629089076, [[9, 5], [11], [12], [10, 8], [7, 2], [1], [4, 6], [3]])
+#       (2223.9106, 538.8308585215631, [[10, 9], [4, 6], [1], [12], [11, 5], [7], [2, 8], [3]])
+#       (2308.4466, 560.3736090616171, [[4], [6], [9, 10], [11, 5], [8, 12], [2, 7], [1], [3]])
+#       (2326.4359, 563.6717104361878, [[7], [11, 5], [8, 2], [1], [10, 9], [12], [3], [4, 6]]) 
+#       ...
 # ]
 
 def get_graph(inputString):
@@ -50,7 +55,7 @@ def find_agreement(input_list, graph):
         for x in [0 for y in range(len(graph.nodeList))]]
 
     for solution in input_list:
-        for subgraphNodeList in solution[1]:
+        for subgraphNodeList in solution[2]:
             for node1 in subgraphNodeList:
                 for node2 in subgraphNodeList:
                     agreement_matrix[node1 - 1][node2 - 1] += 1

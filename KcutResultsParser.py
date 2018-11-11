@@ -13,10 +13,11 @@ def parseDir(dirPath):
         with open(os.path.join(dirPath, f)) as current_file:
             info += "".join(current_file.readlines()[-2:-1])
     # print(f"INFO:\n{info}")
-    pattern = re.compile(r"\s\d+\s(\d+\.\d+).*(\[\[.*\]\])")
+    pattern = re.compile(r"\s\d+\s(\d+\.\d+)\s(\d+\.\d+).*(\[\[.*\]\])")
     result = re.match(pattern, info)
     result = re.findall(pattern, info)
-    result = [(float(solution[0]), eval(solution[1])) for solution in result]
+    result = [(float(solution[0]), float(solution[1]), 
+        eval(solution[2])) for solution in result]
     return result
 
 

@@ -313,15 +313,18 @@ class Generation:
         In this case fitness is the shortest possible distance, so
         the lower the better.
         """
-        maxCut = sum( [x.weight for x in list(itertools.chain.from_iterable([node.adjList for node in\
-            self.graph.nodeList]))] )
+        maxCut = math.inf
+        # sum( [x.weight for x in list(itertools.chain.from_iterable([node.adjList for node in\
+        #     self.graph.nodeList]))] )
         bestFitness = maxCut
         for i in self.population:
             if i.fitness <= bestFitness:
                 bestFitness = i.fitness
         
         kcutList = [x.kcut for x in self.population if x.fitness == bestFitness]
-        return (kcutList, bestFitness)
+        # kcutCost = Kcut.getKcutCost(kcutList[0])
+        kcutFitness = Kcut.getKcutFitness(kcutList[0])
+        return (kcutList, kcutFitness)
 
     def getGenInfo(self):
         """Returns all generation info"""
@@ -329,9 +332,10 @@ class Generation:
         best = self.getBestSolution()
         bestFitness = best[1]
         bestKcut = best[0]
+        bestKcutCost = Kcut.getKcutCost(bestKcut[0])
         avgFitness = self.calcAverageFitness()
         stdDev = self.calcStandardDeviation()
-        return (iteration, bestFitness, avgFitness, stdDev, bestKcut)
+        return (iteration, bestFitness, avgFitness, stdDev, bestKcut, bestKcutCost)
 
     ## printing / logging functions
     def openLog(self, test_select, cnt):
@@ -398,8 +402,8 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, test_select, cnt, k 
             log.write(f"TEST {test_num}: pop = {pop_size}, # of generations = {num_of_gen} "
                 f"selection = {selection_op}, crossover = {crossover_op}, "
                 f"mutation = {mutation_op}, mutation chance = {mutation_chance}\n")
-            log.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format("iter", "best fit",
-                f"avg fit", "std dev", "best cut"))
+            log.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format("iter", "best fit",
+                f"best cost", "avg fit", "std dev", "best cut"))
         
         for dummy in range(num_of_gen):
             currentGen.iterateGen(selection_op, crossover_op, mutation_op,
@@ -412,9 +416,9 @@ def geneticAlgoGenerator(inputString, pop_size, num_of_gen, test_select, cnt, k 
             s = [node.nodeList for node in best[4][0]]
             st = [[x.no for x in y] for y in s]
             if log_out:
-                log.write(f"{best[0]:4d}\t{best[1]:.4f}\t{best[2]:>10.4f}\t"
+                log.write(f"{best[0]:4d}\t{best[1]:.4f}\t{best[5]}\t{best[2]:>10.4f}\t"
                           f"{best[3]:>10.4f}\t{st}\n")
-            yield (best[4], best[1])
+            yield (best[4], best[1], best[5])
     
     with currentGen.openLog(test_select, cnt) as log:
         time1 = time.time()
@@ -480,9 +484,9 @@ def main(inputFile):
     #     print("-------------------------------------------")
     #     print(f"{index} {chromo}: {chromo.kcut}")
     #     print("-------------------------------------------")
-    for i in range(1, 11):
+    for i in range(1, 25):
         generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 25, 
-            test_select = 1, cnt = i, k = 4)
+            test_select = 5, cnt = i, k = 8)
         for _ in generator:
             pass
 
