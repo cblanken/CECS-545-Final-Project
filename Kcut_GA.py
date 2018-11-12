@@ -314,8 +314,6 @@ class Generation:
         the lower the better.
         """
         maxCut = math.inf
-        # sum( [x.weight for x in list(itertools.chain.from_iterable([node.adjList for node in\
-        #     self.graph.nodeList]))] )
         bestFitness = maxCut
         for i in self.population:
             if i.fitness <= bestFitness:
@@ -485,8 +483,8 @@ def main(inputFile):
     #     print(f"{index} {chromo}: {chromo.kcut}")
     #     print("-------------------------------------------")
     for i in range(1, 25):
-        generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 25, 
-            test_select = 6, cnt = i, k = 6)
+        generator = geneticAlgoGenerator(inputString, pop_size= 50, num_of_gen = 50, 
+            test_select = 50, cnt = i, k = 6)
         for _ in generator:
             pass
 

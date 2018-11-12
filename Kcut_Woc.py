@@ -11,11 +11,17 @@ import os
 import sys
 import copy
 import time
+import itertools
+import collections
+import random
 import Kcut
 import KcutResultsParser as rp
 
+TEST_LOG_BIT = False
+
 ## agreement matrix, a list of 
 agreement_matrix = []
+NodePair = collections.namedtuple('NodePair', ['agreement', 'node1', 'node2'])
 
 ## list of dictionaries containing (valid TSP solution, fitness) to be aggregated
 ### EXAMPLE input_list
@@ -53,15 +59,176 @@ def find_agreement(input_list, graph):
     """
     agreement_matrix = [[0 for x in range(len(graph.nodeList))]\
         for x in [0 for y in range(len(graph.nodeList))]]
+    
+    for row in range(len(agreement_matrix)):
+        for col in range(len(agreement_matrix)):
+            if row > col:
+                agreement_matrix[row][col] = -1
 
     for solution in input_list:
         for subgraphNodeList in solution[2]:
             for node1 in subgraphNodeList:
                 for node2 in subgraphNodeList:
-                    agreement_matrix[node1 - 1][node2 - 1] += 1
+                    if node1 <= node2:
+                        agreement_matrix[node1 - 1][node2 - 1] += 1
 
     return agreement_matrix
 
+
+def get_agreementList(agreement_matrix, graph):
+    agreementList = []
+    for i, row in enumerate(agreement_matrix):
+        for j, col in enumerate(row):
+            if col > 0 and i < j:
+                agreementList.append(NodePair(agreement_matrix[i][j], i+1, j+1))                
+    return agreementList
+
+
+def _join_subgraphs(sub1, sub2):
+    newSub = sub1
+    for node in sub2.nodeList:
+        newSub.addNode(node)
+    return newSub
+
+def _find_node(kcut, node_num):
+    """:returns: (node_num, subgraph_id)"""
+    for subgraph in kcut:
+        if node_num in [x.no for x in subgraph.nodeList]:
+            return subgraph.id
+    return None
+
+def get_aggregate(agreementList, graph, inputList):
+    k = len(inputList[0][2])
+    agreement_max = agreementList[0].agreement
+    kcut = [Kcut.Subgraph(0, [], [])]
+    ## intialize subgraph with best choices from agreementList
+    first_subgraph = kcut[0]
+    remainingNodes = copy.deepcopy(graph.nodeList)
+    remainingNodePairs = copy.deepcopy(agreementList)
+    for nodePair in agreementList:
+        if nodePair.agreement != agreement_max:
+            break
+        else:
+            firstNode = graph.nodeList[nodePair.node1-1]
+            secondNode = graph.nodeList[nodePair.node2-1]
+            if firstNode not in first_subgraph.nodeList:
+                first_subgraph.addNode(firstNode)
+                remainingNodes.remove(firstNode)
+            if secondNode not in first_subgraph.nodeList:
+                first_subgraph.addNode(secondNode)
+                remainingNodes.remove(secondNode)
+            remainingNodePairs.remove(nodePair)
+
+    currNodePairList = [np for np in agreementList if \
+        np.agreement == remainingNodePairs[0].agreement]
+    if TEST_LOG_BIT:
+        print(currNodePairList)
+    while len(kcut) < k:
+        currNodePairList = [np for np in agreementList if \
+            np.agreement == remainingNodePairs[0].agreement]
+        if TEST_LOG_BIT:
+            for subgraph in kcut:
+                print(subgraph)
+
+
+        while(currNodePairList):
+
+            if TEST_LOG_BIT:
+                print(f"REMAINING NODES: {len(remainingNodes)}")
+            for currNodePair, nodePair in enumerate(currNodePairList):
+                ## if all remaining subgraphs available are single points
+                if TEST_LOG_BIT:
+                    print(f"SUBGRAPHS USED SO FAR {len(list(itertools.chain(kcut)))}")
+                    print(f"K: {k}")
+                if len(list(itertools.chain(kcut))) + len(remainingNodes) == k:
+                    if TEST_LOG_BIT:
+                        print("RAN OUT OF NODES, FILLING REST")
+                    for node in remainingNodes:
+                        kcut.append(Kcut.Subgraph(kcut[-1].id+1, [node], [node.adjList]))
+                        currNodePairList = None
+                    break
+                if TEST_LOG_BIT:
+                    print(f"CURR NODE: {nodePair}")
+                ## if neither node is in a subgraph put both into a subgraph together
+                if graph.nodeList[nodePair.node1-1] in remainingNodes and graph.nodeList[nodePair.node2-1] in remainingNodes:
+                    subgraphID = kcut[-1].id+1
+                    kcut.append(Kcut.Subgraph(subgraphID, [], []))
+                    kcut[subgraphID].addNode(graph.nodeList[nodePair.node1-1])
+                    kcut[subgraphID].addNode(graph.nodeList[nodePair.node2-1])
+                    remainingNodes.remove(graph.nodeList[nodePair.node1-1])
+                    remainingNodes.remove(graph.nodeList[nodePair.node2-1])
+
+
+                ## if both nodes already in subgraphs check if they 
+                ## are in different subgraphs and should be joined
+                elif graph.nodeList[nodePair.node1-1] not in remainingNodes and\
+                    graph.nodeList[nodePair.node2-1] not in remainingNodes:  
+                    ## check if nodes are in different subgraphs and join them if they are
+                    node1SubgraphID = 0
+                    node2SubgraphID = 0
+                    for i, subgraph in enumerate(kcut):
+                        if graph.nodeList[nodePair.node1-1] in subgraph.nodeList:
+                            node1SubgraphID = i
+                            break
+                    for j, subgraph in enumerate(kcut):
+                        if graph.nodeList[nodePair.node2-1] in subgraph.nodeList:
+                            node2SubgraphID = j
+                            break
+                    if node1SubgraphID != node2SubgraphID:
+                        newSubgraph = _join_subgraphs(kcut[node1SubgraphID], kcut[node2SubgraphID]) 
+                        ## remove (2) old subgraphs from kcut and add newSubgraph to kcut 
+                        kcut.remove(kcut[node1SubgraphID])
+                        if node1SubgraphID < node2SubgraphID:
+                            node2SubgraphID -= 1
+                        kcut.remove(kcut[node2SubgraphID])
+                        kcut.append(newSubgraph)
+                        ## reindex the subgraphs
+                        for i, subgraph in enumerate(kcut):
+                            subgraph.id = i
+
+                ## if one node not in a subgraph find subgraph(s) for the other 
+                ## node of the pair and add potentialNode to one of them (subgraph)
+                else:
+                    nodesToCheck = []
+                    if graph.nodeList[nodePair.node1-1] in remainingNodes and graph.nodeList[nodePair.node2-1] not in remainingNodes:
+                        potentialNode = nodePair.node1
+                        nodesToCheck.append(nodePair.node2)
+                    elif graph.nodeList[nodePair.node2-1] in remainingNodes and graph.nodeList[nodePair.node1-1] not in remainingNodes:
+                        potentialNode = nodePair.node2    
+                        nodesToCheck.append(nodePair.node1)
+                    for subNodePair in currNodePairList[currNodePair:]:
+                        if subNodePair.node1 == potentialNode:
+                            nodesToCheck.append(subNodePair.node2)
+                        elif subNodePair.node2 == potentialNode:
+                            nodesToCheck.append(subNodePair.node1)
+                    subID = _find_node(kcut, nodesToCheck[0])
+                    potentialSubgraphs = [subID]
+                    for node in nodesToCheck:
+                        if node not in [n.no for n in kcut[subID].nodeList]:
+                            potentialSubgraph = _find_node(kcut, node)
+                            if potentialSubgraph not in potentialSubgraphs and potentialSubgraph != None:
+                                potentialSubgraphs.append(potentialSubgraph)
+                    if TEST_LOG_BIT:
+                        print(f"potential: {potentialNode}")
+                    if len(potentialSubgraphs) > 1:
+                        kcut[random.choice(potentialSubgraphs)].addNode(graph.nodeList[potentialNode-1])
+                        remainingNodes.remove(graph.nodeList[potentialNode-1])
+                    else:
+                        kcut[potentialSubgraphs[0]].addNode(graph.nodeList[potentialNode-1])
+                        remainingNodes.remove(graph.nodeList[potentialNode-1])
+                    if TEST_LOG_BIT:
+                        print(f"REMAINING NODES:")
+                        for i in remainingNodes:
+                            print(i.no)
+
+                remainingNodePairs.remove(nodePair)
+                currNodePairList = [np for np in agreementList if \
+                    np.agreement == remainingNodePairs[0].agreement]
+                if TEST_LOG_BIT:
+                    for subgraph in kcut:
+                        print(subgraph)
+                # input("AFTER\n")
+    return kcut
 
 
 
@@ -78,8 +245,6 @@ def printAgreementMatrix(agreement, fittest):
         print("-", end="")
     print()
     for i, x in enumerate(agreement):
-        # row = "|".join(str(i) for i in x)
-        # print(f"{i+1}|", f"{'|':>{alignmentList[i]}}".join(str(i) for i in x))
         print(f"{i+1:>4}", end="")
         for j, y in enumerate(x):
             colStr = f"{y}"
@@ -92,10 +257,21 @@ def main(dirPath, inputGraphFile = None):
         graph = Kcut.parseInputGraph(inputGraphFile)
     inputList = rp.parseDir(dirPath)
     
+    print("\nINPUT LIST:")
+    print(inputList)
     fittest = select_fittest_individuals(inputList, .50)
     agreement = find_agreement(fittest, graph)
     printAgreementMatrix(agreement, fittest)
+    agreementList = sorted(get_agreementList(agreement, graph), key=lambda x: x.agreement, 
+        reverse=True)
+    
+    for node in agreementList:
+        print(node)
 
+    kcut_aggregate = get_aggregate(agreementList, graph, inputList)
+    print("\nAGGREGATE KCUT:")
+    for subgraph in kcut_aggregate:
+        print(subgraph)
 
 
 if __name__ == "__main__":
